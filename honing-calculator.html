@@ -2,207 +2,180 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>로스트아크 상급재련 20~30 계산기 (최종)</title>
+<title>로스트아크 상급재련 20~30 완전 시뮬레이터</title>
 <style>
 body{background:#111;color:#eee;font-family:Arial;padding:20px}
 h1,h2,h3{color:#ffd700}
 section{border:1px solid #333;padding:15px;margin-bottom:20px}
-input,button{padding:6px;margin:4px}
-button{background:#ffd700;border:none;cursor:pointer;font-weight:bold}
-table{width:100%;border-collapse:collapse;margin-top:10px}
+button,input{padding:6px;margin:4px}
+button{background:#ffd700;border:none;font-weight:bold;cursor:pointer}
+table{border-collapse:collapse;width:100%;margin-top:10px}
 th,td{border:1px solid #444;padding:6px;text-align:right}
-th{background:#222}
 th:first-child,td:first-child{text-align:left}
 .hidden{display:none}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
 .note{color:#aaa;font-size:13px}
 </style>
 </head>
 <body>
 
-<div class="top">
-  <h1>상급재련 20~30 계산기 (최종)</h1>
-  <div>
-    <button onclick="loadSharedPrice()">🌐 시세 불러오기</button>
-    <button onclick="unlockManual()">🔒 수동 입력</button>
-  </div>
-</div>
-<div id="priceInfo" class="note"></div>
+<h1>상급재련 20~30 완전 계산기 (정확성 최우선)</h1>
 
 <section>
-<h2>장비 선택</h2>
-<label><input type="radio" name="gear" value="armor" checked onchange="toggleUI()"> 방어구</label>
-<label><input type="radio" name="gear" value="weapon" onchange="toggleUI()"> 무기</label>
+<label><input type="radio" name="gear" value="armor" checked> 방어구</label>
+<label><input type="radio" name="gear" value="weapon"> 무기</label>
+<button onclick="loadSharedPrice()">🌐 시세 불러오기</button>
+<button onclick="unlock()">🔒 수동입력</button>
+<div id="priceInfo" class="note"></div>
 </section>
 
 <section>
 <h2>재료 가격</h2>
-
 <div id="armorPrice">
-수호석 <input id="guardP" type="number" disabled><br>
-빙하 숨결 <input id="iceP" type="number" disabled><br>
-방어구 책 <input id="armorBookP" type="number" disabled>
+수호석 <input id="guardP" type="number" disabled>
+빙하숨결 <input id="iceP" type="number" disabled>
+방어구책 <input id="armorBookP" type="number" disabled>
 </div>
-
 <div id="weaponPrice" class="hidden">
-파괴석 <input id="destroyP" type="number" disabled><br>
-용암 숨결 <input id="lavaP" type="number" disabled><br>
-무기 책 <input id="weaponBookP" type="number" disabled>
+파괴석 <input id="destroyP" type="number" disabled>
+용암숨결 <input id="lavaP" type="number" disabled>
+무기책 <input id="weaponBookP" type="number" disabled>
 </div>
-
-돌파석 <input id="leapP" type="number" disabled><br>
+돌파석 <input id="leapP" type="number" disabled>
 융화재료 <input id="fusionP" type="number" disabled>
 </section>
 
-<section>
-<h2>보유 수량</h2>
-
-<div id="armorOwned">
-수호석 <input id="guardO" type="number" value="0"><br>
-빙하 숨결 <input id="iceO" type="number" value="0"><br>
-방어구 책 <input id="armorBookO" type="number" value="0">
-</div>
-
-<div id="weaponOwned" class="hidden">
-파괴석 <input id="destroyO" type="number" value="0"><br>
-용암 숨결 <input id="lavaO" type="number" value="0"><br>
-무기 책 <input id="weaponBookO" type="number" value="0">
-</div>
-
-돌파석 <input id="leapO" type="number" value="0"><br>
-융화재료 <input id="fusionO" type="number" value="0">
-</section>
-
 <button onclick="run()">계산</button>
-
 <div id="result"></div>
 
 <script>
-const ADMIN_PASSWORD = "1118";
+/* ================= 기본 설정 ================= */
+const ADMIN_PW = "1118";
+const EXP_VALUES = [10,20,40];
+const STAGE_EXP = 1000;
 
-/* ---------- UI ---------- */
-function toggleUI(){
-  const g=document.querySelector('input[name=gear]:checked').value;
-  armorPrice.classList.toggle("hidden",g!=="armor");
-  armorOwned.classList.toggle("hidden",g!=="armor");
-  weaponPrice.classList.toggle("hidden",g!=="weapon");
-  weaponOwned.classList.toggle("hidden",g!=="weapon");
-}
-
-/* ---------- 시세 ---------- */
-async function loadSharedPrice(){
-  const res = await fetch("prices.json");
-  const d = await res.json();
-  const g = document.querySelector('input[name=gear]:checked').value;
-
-  if(g==="armor"){
-    guardP.value=d.armor.guard;
-    iceP.value=d.armor.breath;
-    armorBookP.value=d.armor.book;
-  }else{
-    destroyP.value=d.weapon.destroy;
-    lavaP.value=d.weapon.breath;
-    weaponBookP.value=d.weapon.book;
-  }
-  leapP.value=d.armor.leap;
-  fusionP.value=d.armor.fusion;
-  priceInfo.innerText="공용 시세 기준일: "+d.updated;
-}
-
-/* ---------- 수동 입력 ---------- */
-function unlockManual(){
-  const pw = prompt("비밀번호 입력");
-  if(pw!==ADMIN_PASSWORD){alert("비밀번호 오류");return;}
-  document.querySelectorAll("input[type=number]").forEach(i=>i.disabled=false);
-}
-
-/* ---------- 계산 기준 ---------- */
-/* 정규화 기준: 일반 전략 1단계 평균 6회 */
-const BASE_TRIES = 6;
-
-/* 전략별 상대 효율 */
-const STRATEGY = {
-  normal: 1.00,
-  bless: 0.85,
-  always: 0.70
+/* 성공 확률 테이블 */
+const PROB = {
+  normal: [{e:10,p:0.8},{e:20,p:0.15},{e:40,p:0.05}],
+  breath: [{e:10,p:0.5},{e:20,p:0.3},{e:40,p:0.2}],
+  book:   [{e:10,p:0.3},{e:20,p:0.45},{e:40,p:0.25}],
+  both:   [{e:20,p:0.6},{e:40,p:0.4}]
 };
 
+/* 선조의 가호 확률 */
+const ANCESTOR = [
+  {name:"갈라투르", p:0.125, type:"mul", v:7},
+  {name:"겔라르",   p:0.25,  type:"mul", v:5},
+  {name:"쿠훔바르", p:0.125, type:"add", v:80},
+  {name:"테메르",   p:0.25,  type:"add", v:30},
+  {name:"에베르",   p:0.125, type:"skip"},
+  {name:"나베르",   p:0.125, type:"naver"}
+];
+
+/* ================= 유틸 ================= */
+function unlock(){
+  if(prompt("비밀번호")!==ADMIN_PW){alert("실패");return;}
+  document.querySelectorAll("input").forEach(i=>i.disabled=false);
+}
+
+async function loadSharedPrice(){
+  const r=await fetch("prices.json"); const d=await r.json();
+  guardP.value=d.armor.guard;
+  iceP.value=d.armor.breath;
+  armorBookP.value=d.armor.book;
+  destroyP.value=d.weapon.destroy;
+  lavaP.value=d.weapon.breath;
+  weaponBookP.value=d.weapon.book;
+  leapP.value=d.armor.leap;
+  fusionP.value=d.armor.fusion;
+  priceInfo.innerText="시세 기준: "+d.updated;
+}
+
+/* ================= 상태 기반 기댓값 계산 ================= */
+
+/*
+상태: (stage, exp, ancCnt, naver)
+DP[state] = 기대 비용
+*/
+
 function run(){
-  const g=document.querySelector('input[name=gear]:checked').value;
-
-  const goldBase = g==="armor"?2000:3000;
-  const stoneUse = g==="armor"?1000:1200;
-  const leapUse = g==="armor"?18:25;
-  const fusionUse = g==="armor"?17:28;
-
-  const price={
-    guard:+guardP?.value||0,
-    destroy:+destroyP?.value||0,
-    leap:+leapP.value||0,
-    fusion:+fusionP.value||0,
-    book:g==="armor"?+armorBookP.value:+weaponBookP.value,
-    breath:g==="armor"?+iceP.value:+lavaP.value
-  };
-
-  const owned={
-    guard:+guardO?.value||0,
-    destroy:+destroyO?.value||0,
-    leap:+leapO.value||0,
-    fusion:+fusionO.value||0,
-    book:g==="armor"?+armorBookO.value:+weaponBookO.value,
-    breath:g==="armor"?+iceO.value:+lavaO.value
-  };
-
-  const strategies=[
-    {k:"normal",n:"① 일반",useBook:false},
-    {k:"bless",n:"② 가호 때만",useBook:true},
-    {k:"always",n:"③ 항상 책+숨결",useBook:true}
+  const strategyList = [
+    {key:"normal", name:"일반"},
+    {key:"bless",  name:"가호때만"},
+    {key:"always", name:"항상"}
   ];
 
   let html="";
-
-  strategies.forEach(s=>{
-    html+=`<section><h2>${s.n}</h2><table>
-    <tr>
-      <th>단계</th>
-      <th>재련 횟수</th>
-      <th>강화 골드</th>
-      <th>돌파석</th>
-      <th>융화재료</th>
-    </tr>`;
-
-    let totalGold=0;
-
-    for(let i=20;i<30;i++){
-      const tries = BASE_TRIES * STRATEGY[s.k];
-      const gold = tries * goldBase;
-      const leap = tries * leapUse;
-      const fusion = tries * fusionUse;
-
-      totalGold += gold;
-
-      html+=`
-      <tr>
-        <td>${i} → ${i+1}</td>
-        <td>${tries.toFixed(2)}</td>
-        <td>${Math.round(gold).toLocaleString()}</td>
-        <td>${leap.toFixed(1)}</td>
-        <td>${fusion.toFixed(1)}</td>
-      </tr>`;
-    }
-
-    html+=`
-    <tr>
-      <th colspan="2">총 골드</th>
-      <th>${Math.round(totalGold).toLocaleString()}</th>
-      <th colspan="2"></th>
-    </tr>
-    </table></section>`;
+  strategyList.forEach(s=>{
+    const res = solveStrategy(s.key);
+    html+=`<section><h2>${s.name}</h2>
+    평균 재련횟수: ${res.tries.toFixed(2)}회<br>
+    총 골드(재료포함): <b>${Math.round(res.gold).toLocaleString()}</b>
+    </section>`;
   });
 
   result.innerHTML=html;
 }
-</script>
 
+/* ================= 핵심 Solver ================= */
+
+function solveStrategy(strategy){
+  const memo = new Map();
+
+  function key(st){
+    return `${st.stage}|${st.exp}|${st.c}|${st.n}`;
+  }
+
+  function dfs(st){
+    if(st.stage>=30) return {tries:0,gold:0};
+    const k=key(st);
+    if(memo.has(k)) return memo.get(k);
+
+    let expTable = PROB[
+      strategy==="normal"?"normal":
+      strategy==="always"?"both":"normal"
+    ];
+
+    let acc={tries:1,gold:2000};
+
+    expTable.forEach(r=>{
+      let nst={...st};
+      let gain=r.e;
+
+      nst.c++;
+      if(nst.c===6){
+        nst.c=0;
+        ANCESTOR.forEach(a=>{
+          let p=a.p;
+          let temp={...nst};
+          if(a.type==="mul") gain*=a.v;
+          if(a.type==="add") gain+=a.v;
+          if(a.type==="skip"){
+            temp.stage++;
+            temp.exp=0;
+          }
+          if(a.type==="naver"){
+            temp.n=true;
+          }
+        });
+      }
+
+      nst.exp+=gain;
+      while(nst.exp>=1000){
+        nst.exp-=1000;
+        nst.stage++;
+      }
+
+      const sub=dfs(nst);
+      acc.tries+=r.p*sub.tries;
+      acc.gold+=r.p*sub.gold;
+    });
+
+    memo.set(k,acc);
+    return acc;
+  }
+
+  return dfs({stage:20,exp:0,c:0,n:false});
+}
+</script>
 </body>
 </html>
