@@ -7,44 +7,39 @@
 body{
   background:#0f1115;
   color:#eaeaea;
-  font-family: Pretendard, Arial, sans-serif;
-  padding:24px;
+  font-family:Pretendard,Arial,sans-serif;
+  padding:24px
 }
-h1{color:#ffd966;margin-bottom:16px}
+h1{color:#ffd966}
 section{
   background:#171a21;
   border-radius:16px;
   padding:18px;
   margin-bottom:18px;
-  box-shadow:0 6px 16px rgba(0,0,0,0.25);
+  box-shadow:0 6px 16px rgba(0,0,0,.25)
 }
 h2{color:#ffd966;margin-top:0}
 .flex{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 button{
-  background:#ffd966;
-  border:none;
+  background:#ffd966;border:none;
   border-radius:12px;
   padding:10px 16px;
-  font-weight:700;
-  cursor:pointer;
+  font-weight:700;cursor:pointer
 }
 button:hover{background:#ffe699}
 input{
-  border-radius:10px;
+  background:#0f1115;color:#eaeaea;
   border:1px solid #333;
+  border-radius:10px;
   padding:6px 10px;
-  background:#0f1115;
-  color:#eaeaea;
+  width:110px
 }
 table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:12px;
+  width:100%;border-collapse:collapse;margin-top:12px
 }
 th,td{
   border-bottom:1px solid #2a2d35;
-  padding:8px;
-  text-align:right;
+  padding:8px;text-align:right
 }
 th:first-child,td:first-child{text-align:left}
 .hidden{display:none}
@@ -69,56 +64,57 @@ th:first-child,td:first-child{text-align:left}
 <section>
 <h2>재료 가격</h2>
 <div id="armorPrice" class="flex">
-  수호석 <input id="guardP" type="number" disabled>
-  빙하의 숨결 <input id="iceP" type="number" disabled>
-  방어구 재련서 <input id="armorBookP" type="number" disabled>
+수호석 <input id="guardP" type="number" disabled>
+빙하의 숨결 <input id="iceP" type="number" disabled>
+방어구 재련서 <input id="armorBookP" type="number" disabled>
 </div>
 <div id="weaponPrice" class="flex hidden">
-  파괴석 <input id="destroyP" type="number" disabled>
-  용암의 숨결 <input id="lavaP" type="number" disabled>
-  무기 재련서 <input id="weaponBookP" type="number" disabled>
+파괴석 <input id="destroyP" type="number" disabled>
+용암의 숨결 <input id="lavaP" type="number" disabled>
+무기 재련서 <input id="weaponBookP" type="number" disabled>
 </div>
 <div class="flex">
-  돌파석 <input id="leapP" type="number" disabled>
-  융화재료 <input id="fusionP" type="number" disabled>
+돌파석 <input id="leapP" type="number" disabled>
+융화재료 <input id="fusionP" type="number" disabled>
 </div>
 </section>
 
 <section>
 <h2>보유 수량</h2>
 <div id="armorOwned" class="flex">
-  수호석 <input id="guardO" type="number" value="0">
-  빙하의 숨결 <input id="iceO" type="number" value="0">
-  방어구 재련서 <input id="armorBookO" type="number" value="0">
+수호석 <input id="guardO" type="number" value="0">
+빙하의 숨결 <input id="iceO" type="number" value="0">
+방어구 재련서 <input id="armorBookO" type="number" value="0">
 </div>
 <div id="weaponOwned" class="flex hidden">
-  파괴석 <input id="destroyO" type="number" value="0">
-  용암의 숨결 <input id="lavaO" type="number" value="0">
-  무기 재련서 <input id="weaponBookO" type="number" value="0">
+파괴석 <input id="destroyO" type="number" value="0">
+용암의 숨결 <input id="lavaO" type="number" value="0">
+무기 재련서 <input id="weaponBookO" type="number" value="0">
 </div>
 <div class="flex">
-  돌파석 <input id="leapO" type="number" value="0">
-  융화재료 <input id="fusionO" type="number" value="0">
+돌파석 <input id="leapO" type="number" value="0">
+융화재료 <input id="fusionO" type="number" value="0">
 </div>
 </section>
 
 <section>
-  <button onclick="run()">계산</button>
+<button onclick="run()">계산</button>
 </section>
 
 <div id="result"></div>
 
 <script>
-/* ================= 설정 ================= */
-const ADMIN_PW = "1118";
+/* ===== 설정 ===== */
+const ADMIN_PW="1118";
+const TOTAL_EXP=1000;
 
-/* 기댓값 기반 상수 */
-const BASE_EXPECTED = 13;      // 기본 기대 경험치
-const ANCESTOR_BONUS = 30/6;  // 선조 보정
-const EXPECTED_EXP = BASE_EXPECTED + ANCESTOR_BONUS; // ≈18
-const TOTAL_EXP = 1000;
+/* 전략별 1회 기대 경험치 (확정값) */
+const EXP_EXPECT={
+  normal:18,
+  bless:19.33,
+  always:26
+};
 
-/* ================= UI ================= */
 function toggle(){
   const g=document.querySelector('input[name=gear]:checked').value;
   armorPrice.classList.toggle("hidden",g!=="armor");
@@ -129,38 +125,35 @@ function toggle(){
 
 function unlock(){
   if(prompt("비밀번호 입력")!==ADMIN_PW){
-    alert("비밀번호가 틀렸습니다");
-    return;
+    alert("비밀번호가 틀렸습니다"); return;
   }
   document.querySelectorAll("input[type=number]").forEach(i=>i.disabled=false);
 }
 
 async function loadPrices(){
-  const r = await fetch("prices.json");
-  const d = await r.json();
+  const r=await fetch("prices.json");
+  const d=await r.json();
 
-  guardP.value = d.armor.guard;
-  iceP.value = d.armor.breath;
-  armorBookP.value = d.armor.book;
+  guardP.value=d.armor.guard;
+  iceP.value=d.armor.breath;
+  armorBookP.value=d.armor.book;
 
-  destroyP.value = d.weapon.destroy;
-  lavaP.value = d.weapon.breath;
-  weaponBookP.value = d.weapon.book;
+  destroyP.value=d.weapon.destroy;
+  lavaP.value=d.weapon.breath;
+  weaponBookP.value=d.weapon.book;
 
-  leapP.value = d.armor.leap;
-  fusionP.value = d.armor.fusion;
+  leapP.value=d.armor.leap;
+  fusionP.value=d.armor.fusion;
 
-  priceInfo.textContent = "시세 기준: " + d.updated;
+  priceInfo.textContent="시세 기준: "+d.updated;
 }
 
-/* ================= 계산 ================= */
 function run(){
   const gear=document.querySelector('input[name=gear]:checked').value;
-  const tries = TOTAL_EXP / EXPECTED_EXP; // 평균 강화 횟수
 
   const cost = gear==="armor"
-    ? {gold:2000, guard:1000, leap:18, fusion:17}
-    : {gold:3000, destroy:1200, leap:25, fusion:28};
+    ? {gold:2000, main:"guard", mainAmt:1000, leap:18, fusion:17}
+    : {gold:3000, main:"destroy", mainAmt:1200, leap:25, fusion:28};
 
   const price={
     guard:+guardP?.value||0,
@@ -181,60 +174,48 @@ function run(){
   };
 
   const strategies=[
-    {n:"일반", book:0},
-    {n:"가호때만", book:tries/6},
-    {n:"항상", book:tries}
+    {k:"normal",n:"일반"},
+    {k:"bless",n:"가호때만"},
+    {k:"always",n:"항상"}
   ];
 
   let html="";
   strategies.forEach(s=>{
-    const mat={
-      guard:(cost.guard||0)*tries,
-      destroy:(cost.destroy||0)*tries,
-      leap:cost.leap*tries,
-      fusion:cost.fusion*tries,
-      book:s.book,
-      breath:s.book*20
-    };
+    const tries=TOTAL_EXP/EXP_EXPECT[s.k];
+    const bookCnt=s.k==="always"?tries:s.k==="bless"?tries/6:0;
+    const breathCnt=bookCnt*20;
 
-    let totalGold = tries * cost.gold;
+    let totalGold=tries*cost.gold;
     let rows="";
 
-    Object.keys(mat).forEach(k=>{
-      const need = Math.max(0, mat[k] - (owned[k]||0));
-      const gold = need * (price[k]||0);
-      totalGold += gold;
-      rows += `<tr>
-        <td>${nameKR(k)}</td>
-        <td>${mat[k].toFixed(1)}</td>
-        <td>${Math.round(gold).toLocaleString()}</td>
-      </tr>`;
-    });
+    function add(name,key,amount){
+      const need=Math.max(0,amount-(owned[key]||0));
+      const gold=need*(price[key]||0);
+      totalGold+=gold;
+      rows+=`<tr><td>${name}</td><td>${amount.toFixed(1)}</td><td>${Math.round(gold).toLocaleString()}</td></tr>`;
+    }
 
-    html += `
+    add(cost.main==="guard"?"수호석":"파괴석",cost.main,tries*cost.mainAmt);
+    add("돌파석","leap",tries*cost.leap);
+    add("융화재료","fusion",tries*cost.fusion);
+    if(bookCnt>0){
+      add("재련서","book",bookCnt);
+      add("숨결","breath",breathCnt);
+    }
+
+    html+=`
     <section>
       <h2>${s.n}</h2>
       평균 강화 횟수: <b>${tries.toFixed(1)}</b>회
       <table>
-        <tr><th>재료</th><th>소모량</th><th>소모 골드</th></tr>
+        <tr><th>재료</th><th>소모량</th><th>골드</th></tr>
         ${rows}
         <tr><th colspan="2">총 골드</th><th>${Math.round(totalGold).toLocaleString()}</th></tr>
       </table>
     </section>`;
   });
 
-  result.innerHTML = html;
-}
-
-function nameKR(k){
-  return {
-    guard:"수호석",
-    destroy:"파괴석",
-    leap:"돌파석",
-    fusion:"융화재료",
-    book:"재련서",
-    breath:"숨결"
-  }[k];
+  result.innerHTML=html;
 }
 </script>
 
