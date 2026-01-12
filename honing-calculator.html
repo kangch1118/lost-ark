@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>로스트아크 상급재련 20~30 계산기</title>
+<style>
+body{background:#111;color:#eee;font-family:Arial;padding:20px}
+h1,h2{color:#ffd700}
+section{border:1px solid #333;padding:15px;margin-bottom:20px}
+input,button{padding:6px;margin:4px}
+button{background:#ffd700;border:none;cursor:pointer;font-weight:bold}
+.hidden{display:none}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{border:1px solid #444;padding:6px;text-align:right}
+th{background:#222}
+th:first-child,td:first-child{text-align:left}
+.topbar{display:flex;justify-content:space-between;align-items:center}
+.locked input{background:#222;color:#777}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>상급재련 20~30 전략 비교 계산기</h1>
+  <div>
+    <button onclick="loadSharedPrice()">🌐 공용 시세 불러오기</button>
+    <button onclick="unlockPrice()">🔒 수동 입력</button>
+  </div>
+</div>
+<div id="priceInfo" style="color:#aaa;margin-bottom:10px"></div>
+
+<section>
+<h2>장비 선택</h2>
+<label><input type="radio" name="gear" value="armor" checked onchange="toggleUI()"> 방어구</label>
+<label><input type="radio" name="gear" value="weapon" onchange="toggleUI()"> 무기</label>
+</section>
+
+<section id="priceSection" class="locked">
+<h2>재료 가격</h2>
+
+<div id="armorPrice">
+수호석 <input id="guardP" type="number" disabled>
+빙하 숨결 <input id="iceP" type="number" disabled>
+방어구 책 <input id="armorBookP" type="number" disabled>
+</div>
+
+<div id="weaponPrice" class="hidden">
+파괴석 <input id="destroyP" type="number" disabled>
+용암 숨결 <input id="lavaP" type="number" disabled>
+무기 책 <input id="weaponBookP" type="number" disabled>
+</div>
+
+돌파석 <input id="leapP" type="number" disabled>
+융화재료 <input id="fusionP" type="number" disabled>
+</section>
+
+<section>
+<h2>보유 수량</h2>
+
+<div id="armorOwned">
+수호석 <input id="guardO" type="number" value="0">
+빙하 숨결 <input id="iceO" type="number" value="0">
+방어구 책 <input id="armorBookO" type="number" value="0">
+</div>
+
+<div id="weaponOwned" class="hidden">
+파괴석 <input id="destroyO" type="number" value="0">
+용암 숨결 <input id="lavaO" type="number" value="0">
+무기 책 <input id="weaponBookO" type="number" value="0">
+</div>
+
+돌파석 <input id="leapO" type="number" value="0">
+융화재료 <input id="fusionO" type="number" value="0">
+</section>
+
+<button onclick="run()">계산</button>
+<div id="result"></div>
+
+<script>
+const PASSWORD="1118";
+
+function toggleUI(){
+  const g=document.querySelector('input[name=gear]:checked').value;
+  armorPrice.classList.toggle("hidden",g!=="armor");
+  armorOwned.classList.toggle("hidden",g!=="armor");
+  weaponPrice.classList.toggle("hidden",g!=="weapon");
+  weaponOwned.classList.toggle("hidden",g!=="weapon");
+}
+
+function unlockPrice(){
+  if(prompt("비밀번호 입력")!==PASSWORD){alert("틀림");return;}
+  document.querySelectorAll("#priceSection input").forEach(i=>i.disabled=false);
+  priceSection.classList.remove("locked");
+}
+
+async function loadSharedPrice(){
+  const res=await fetch("prices.json");
+  const d=await res.json();
+  const g=document.querySelector('input[name=gear]:checked').value;
+
+  if(g==="armor"){
+    guardP.value=d.armor.guard;
+    iceP.value=d.armor.breath;
+    armorBookP.value=d.armor.book;
+  }else{
+    destroyP.value=d.weapon.destroy;
+    lavaP.value=d.weapon.breath;
+    weaponBookP.value=d.weapon.book;
+  }
+  leapP.value=d.armor.leap;
+  fusionP.value=d.armor.fusion;
+  priceInfo.innerText="공용 시세 기준일: "+d.updated;
+}
+
+function simulate(useBook){
+  let tries=20;
+  return {
+    tries,
+    use:{
+      guard:guardP?tries*1000:0,
+      destroy:destroyP?tries*1200:0,
+      leap:tries*20,
+      fusion:tries*20,
+      book:useBook?tries:0,
+      breath:useBook?tries:0
+    }
+  };
+}
+
+function calc(u,p,o){return Math.max(0,u-o)*p}
+
+function run(){
+  const g=document.querySelector('input[name=gear]:checked').value;
+  const price={
+    guard:+guardP?.value||0,
+    destroy:+destroyP?.value||0,
+    leap:+leapP.value,
+    fusion:+fusionP.value,
+    book:g==="armor"?+armorBookP.value:+weaponBookP.value,
+    breath:g==="armor"?+iceP.value:+lavaP.value
+  };
+  const owned={
+    guard:+guardO?.value||0,
+    destroy:+destroyO?.value||0,
+    leap:+leapO.value,
+    fusion:+fusionO.value,
+    book:g==="armor"?+armorBookO.value:+weaponBookO.value,
+    breath:g==="armor"?+iceO.value:+lavaO.value
+  };
+
+  let html="";
+  ["일반","가호","항상"].forEach((n,i)=>{
+    const r=simulate(i>0);
+    const total=
+      r.tries*(g==="armor"?2000:3000)+
+      calc(r.use.guard,owned.guard,price.guard)+
+      calc(r.use.destroy,owned.destroy,price.destroy)+
+      calc(r.use.leap,owned.leap,price.leap)+
+      calc(r.use.fusion,owned.fusion,price.fusion)+
+      calc(r.use.book,owned.book,price.book)+
+      calc(r.use.breath,owned.breath,price.breath);
+    html+=`<section><h2>${n}</h2>총 골드 ${total.toLocaleString()}</section>`;
+  });
+  result.innerHTML=html;
+}
+</script>
+</body>
+</html>
