@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>로스트아크 상급재련 전략 비교 계산기</title>
+<style>
+body { background:#111; color:#eee; font-family:Arial; padding:20px; }
+h1 { color:#ffd700; }
+input, select, button { padding:6px; margin:4px; }
+button { background:#ffd700; border:none; cursor:pointer; }
+table { width:100%; border-collapse:collapse; margin-top:20px; }
+th, td { border:1px solid #444; padding:8px; text-align:center; }
+th { background:#222; }
+</style>
+</head>
+<body>
+
+<h1>상급재련 20~30 전략 비교 계산기</h1>
+
+<h3>장비 선택</h3>
+<select id="gear">
+  <option value="armor">방어구</option>
+  <option value="weapon">무기</option>
+</select>
+
+<h3>재료 가격</h3>
+수호석 <input id="guardP" type="number" value="10">
+파괴석 <input id="destP" type="number" value="10">
+돌파석 <input id="leapP" type="number" value="100">
+융화재 <input id="fusionP" type="number" value="300"><br>
+책 가격 <input id="bookP" type="number" value="5000">
+빙하/용암 숨결 가격 <input id="breathP" type="number" value="1000">
+
+<h3>보유 수량</h3>
+책 <input id="bookO" type="number" value="0">
+숨결 <input id="breathO" type="number" value="0">
+
+<br><button onclick="run()">계산</button>
+
+<div id="out"></div>
+
+<script>
+function simulate(mode, cfg, price, owned) {
+  let stage=20, exp=0, tries=0, gold=0;
+  let bookUsed=0, breathUsed=0;
+  let bless=0, enhanced=false;
+
+  while(stage<30){
+    tries++; bless++;
+    let useBook=false, useBreath=false;
+
+    if(mode==="always"){
+      useBook=true; useBreath=true;
+    }
+    if(mode==="blessing" && bless===6){
+      useBook=true; useBreath=true;
+    }
+
+    let gain=13; // 기본
+    if(useBook && useBreath){
+      gain=28; bookUsed++; breathUsed++;
+    }
+
+    if(bless===6){
+      bless=0;
+      let r=Math.random();
+      if(!enhanced){
+        if(r<1/6) gain*=5;
+        else if(r<2/6) gain*=3;
+        else if(r<3/6) gain+=30;
+        else if(r<4/6) gain+=10;
+        else if(r<5/6) enhanced=true;
+        else { stage++; exp=0; continue; }
+      }else{
+        if(r<1/5) gain*=7;
+        else if(r<2/5) gain*=5;
+        else if(r<3/5) gain+=80;
+        else if(r<4/5) gain+=30;
+        else { stage+=2; exp=0; continue; }
+      }
+    }
+
+    exp+=gain;
+    gold+=cfg.gold;
+
+    if(exp>=1000){ stage++; exp=0; }
+  }
+
+  let needBook=Math.max(0, bookUsed-owned.book);
+  let needBreath=Math.max(0, breathUsed-owned.breath);
+
+  let total =
+    gold +
+    needBook*price.book +
+    needBreath*price.breath;
+
+  return {tries, bookUsed, breathUsed, total};
+}
+
+function run(){
+  const gear=document.getElementById("gear").value;
+  const price={
+    guard:+guardP.value, dest:+destP.value,
+    leap:+leapP.value, fusion:+fusionP.value,
+    book:+bookP.value, breath:+breathP.value
+  };
+  const owned={book:+bookO.value, breath:+breathO.value};
+
+  const cfg=gear==="armor"?
+    {gold:2000}:{gold:3000};
+
+  const r1=simulate("normal",cfg,price,owned);
+  const r2=simulate("blessing",cfg,price,owned);
+  const r3=simulate("always",cfg,price,owned);
+
+  out.innerHTML=`
+  <table>
+    <tr><th>전략</th><th>재련횟수</th><th>책 사용</th><th>숨결 사용</th><th>총 골드</th></tr>
+    <tr><td>일반</td><td>${r1.tries}</td><td>${r1.bookUsed}</td><td>${r1.breathUsed}</td><td>${r1.total.toLocaleString()}</td></tr>
+    <tr><td>가호 때만</td><td>${r2.tries}</td><td>${r2.bookUsed}</td><td>${r2.breathUsed}</td><td>${r2.total.toLocaleString()}</td></tr>
+    <tr><td>항상 사용</td><td>${r3.tries}</td><td>${r3.bookUsed}</td><td>${r3.breathUsed}</td><td>${r3.total.toLocaleString()}</td></tr>
+  </table>`;
+}
+</script>
+</body>
+</html>
+
