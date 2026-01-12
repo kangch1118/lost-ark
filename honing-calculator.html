@@ -2,11 +2,11 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>로스트아크 상급재련 20→30 완전 계산기 (최종)</title>
+<title>상급재련 계산기</title>
 <style>
 body{background:#111;color:#eee;font-family:Arial;padding:20px}
-h1,h2{color:#ffd700}
 section{border:1px solid #333;padding:15px;margin-bottom:20px}
+h2{color:#ffd700}
 button,input{padding:6px;margin:4px}
 button{background:#ffd700;border:none;font-weight:bold;cursor:pointer}
 .hidden{display:none}
@@ -15,7 +15,11 @@ button{background:#ffd700;border:none;font-weight:bold;cursor:pointer}
 </head>
 <body>
 
-<h1>상급재련 20→30 계산기 (총 경험치 1000 · 최종)</h1>
+<section>
+<button onclick="loadPrices()">시세 불러오기</button>
+<button onclick="unlock()">수동 입력</button>
+<span id="priceInfo" class="note"></span>
+</section>
 
 <section>
 <label><input type="radio" name="gear" value="armor" checked onchange="toggle()"> 방어구</label>
@@ -23,22 +27,22 @@ button{background:#ffd700;border:none;font-weight:bold;cursor:pointer}
 </section>
 
 <section>
-<h2>재료 시세</h2>
+<h2>재료 가격</h2>
 
 <div id="armorPrice">
-수호석 <input id="guardP" type="number">
-빙하의 숨결 <input id="iceP" type="number">
-방어구 책 <input id="armorBookP" type="number">
+수호석 <input id="guardP" type="number" disabled>
+빙하의 숨결 <input id="iceP" type="number" disabled>
+방어구 책 <input id="armorBookP" type="number" disabled>
 </div>
 
 <div id="weaponPrice" class="hidden">
-파괴석 <input id="destroyP" type="number">
-용암의 숨결 <input id="lavaP" type="number">
-무기 책 <input id="weaponBookP" type="number">
+파괴석 <input id="destroyP" type="number" disabled>
+용암의 숨결 <input id="lavaP" type="number" disabled>
+무기 책 <input id="weaponBookP" type="number" disabled>
 </div>
 
-돌파석 <input id="leapP" type="number">
-융화재료 <input id="fusionP" type="number">
+돌파석 <input id="leapP" type="number" disabled>
+융화재료 <input id="fusionP" type="number" disabled>
 </section>
 
 <section>
@@ -61,37 +65,57 @@ button{background:#ffd700;border:none;font-weight:bold;cursor:pointer}
 </section>
 
 <button onclick="run()">계산</button>
-
 <div id="result"></div>
 
 <script>
-/* ================= 상수 ================= */
-const TOTAL_EXP = 1000;
+/* ================= 기본 ================= */
+const ADMIN_PW="1118";
+const TOTAL_EXP=1000;
 
-/* 성공 확률 */
-const PROB_NORMAL = [
-  {e:10,p:0.8},{e:20,p:0.15},{e:40,p:0.05}
-];
-const PROB_BOTH = [
-  {e:20,p:0.6},{e:40,p:0.4}
-];
+/* 확률 */
+const PROB_NORMAL=[{e:10,p:0.8},{e:20,p:0.15},{e:40,p:0.05}];
+const PROB_BOTH=[{e:20,p:0.6},{e:40,p:0.4}];
 
-/* 선조의 가호 */
-const ANCESTOR = [
-  {p:0.125, type:"mul", v:7},
-  {p:0.25,  type:"mul", v:5},
-  {p:0.125, type:"add", v:80},
-  {p:0.25,  type:"add", v:30},
-  {p:0.125, type:"skip"},
-  {p:0.125, type:"naver"}
+/* 선조 */
+const ANCESTOR=[
+ {p:0.125,type:"mul",v:7},
+ {p:0.25,type:"mul",v:5},
+ {p:0.125,type:"add",v:80},
+ {p:0.25,type:"add",v:30},
+ {p:0.125,type:"skip"},
+ {p:0.125,type:"naver"}
 ];
 
+/* ================= UI ================= */
 function toggle(){
   const g=document.querySelector('input[name=gear]:checked').value;
   armorPrice.classList.toggle("hidden",g!=="armor");
   armorOwned.classList.toggle("hidden",g!=="armor");
   weaponPrice.classList.toggle("hidden",g!=="weapon");
   weaponOwned.classList.toggle("hidden",g!=="weapon");
+}
+
+function unlock(){
+  if(prompt("비밀번호")!==ADMIN_PW){alert("오류");return;}
+  document.querySelectorAll("input[type=number]").forEach(i=>i.disabled=false);
+}
+
+async function loadPrices(){
+  const r=await fetch("prices.json");
+  const d=await r.json();
+
+  guardP.value=d.armor.guard;
+  iceP.value=d.armor.breath;
+  armorBookP.value=d.armor.book;
+
+  destroyP.value=d.weapon.destroy;
+  lavaP.value=d.weapon.breath;
+  weaponBookP.value=d.weapon.book;
+
+  leapP.value=d.armor.leap;
+  fusionP.value=d.armor.fusion;
+
+  priceInfo.innerText="시세 기준: "+d.updated;
 }
 
 /* ================= 계산 ================= */
@@ -122,7 +146,7 @@ function run(){
 
   const strategies=[
     {k:"normal",n:"일반"},
-    {k:"bless", n:"가호때만"},
+    {k:"bless",n:"가호때만"},
     {k:"always",n:"항상"}
   ];
 
@@ -131,20 +155,15 @@ function run(){
     const r=solve(s.k,cost,price,owned);
     html+=`<section>
       <h2>${s.n}</h2>
-      평균 재련 횟수: ${r.tries.toFixed(2)}<br>
-      총 골드(재료 포함): <b>${Math.round(r.gold).toLocaleString()}</b>
+      재련 횟수 기댓값: ${r.t.toFixed(2)}<br>
+      총 골드: <b>${Math.round(r.g).toLocaleString()}</b>
     </section>`;
   });
+
   result.innerHTML=html;
 }
 
 /* ================= Solver ================= */
-/*
-state = (exp, anc, naver)
-exp : 0 ~ 1000
-anc : 0 ~ 5
-naver : boolean
-*/
 function solve(strategy,cost,price,owned){
   const memo=new Map();
   function key(e,a,n){return e+"|"+a+"|"+(n?1:0);}
@@ -169,31 +188,22 @@ function solve(strategy,cost,price,owned){
       }
     };
 
-    const isAncestor = (anc===5);
-    const useBoth =
-      strategy==="always" ||
-      (strategy==="bless" && isAncestor);
+    const isAnc=(anc===5);
+    const useBoth=(strategy==="always")||(strategy==="bless"&&isAnc);
+    if(useBoth){res.m.book+=1;res.m.breath+=20;}
 
-    if(useBoth){
-      res.m.book+=1;
-      res.m.breath+=20; // 숨결은 항상 20개
-    }
-
-    const table = useBoth ? PROB_BOTH : PROB_NORMAL;
+    const table=useBoth?PROB_BOTH:PROB_NORMAL;
 
     table.forEach(r=>{
-      if(isAncestor){
+      if(isAnc){
         ANCESTOR.forEach(a=>{
-          let ne=exp, na=(anc+1)%6, nn=nav;
-          let gain=r.e;
-
-          if(a.type==="mul") gain*=a.v;
-          if(a.type==="add") gain+=a.v;
-          if(a.type==="skip"){ ne=TOTAL_EXP; }
-          if(a.type==="naver"){ nn=true; }
-
-          if(a.type!=="skip") ne+=gain;
-          if(nav && a.type!=="naver") nn=false;
+          let ne=exp,na=(anc+1)%6,nn=nav,g=r.e;
+          if(a.type==="mul")g*=a.v;
+          if(a.type==="add")g+=a.v;
+          if(a.type==="skip")ne=TOTAL_EXP;
+          if(a.type==="naver")nn=true;
+          if(a.type!=="skip")ne+=g;
+          if(nav&&a.type!=="naver")nn=false;
 
           const sub=dfs(ne,na,nn);
           res.t+=r.p*a.p*sub.t;
@@ -214,13 +224,13 @@ function solve(strategy,cost,price,owned){
 
   const r=dfs(0,0,false);
 
-  let totalGold=r.g;
+  let total=r.g;
   Object.keys(r.m).forEach(x=>{
     const need=Math.max(0,(r.m[x]||0)-(owned[x]||0));
-    totalGold+=need*(price[x]||0);
+    total+=need*(price[x]||0);
   });
 
-  return {tries:r.t, gold:totalGold};
+  return {t:r.t,g:total};
 }
 </script>
 
