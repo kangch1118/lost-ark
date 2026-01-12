@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>로스트아크 상급재련 20~30 계산기</title>
+<title>로스트아크 상급재련 20~30 계산기 (기댓값)</title>
 <style>
 body{background:#111;color:#eee;font-family:Arial;padding:20px}
 h1,h2{color:#ffd700}
@@ -21,11 +21,8 @@ th:first-child,td:first-child{text-align:left}
 <body>
 
 <div class="topbar">
-  <h1>상급재련 20~30 전략 비교 계산기</h1>
-  <div>
-    <button onclick="loadSharedPrice()">🌐 공용 시세 불러오기</button>
-    <button onclick="unlockPrice()">🔒 수동 입력</button>
-  </div>
+  <h1>상급재련 20~30 전략 비교 계산기 (기댓값)</h1>
+  <button onclick="loadSharedPrice()">🌐 공용 시세 불러오기</button>
 </div>
 <div id="priceInfo" style="color:#aaa;margin-bottom:10px"></div>
 
@@ -35,23 +32,23 @@ th:first-child,td:first-child{text-align:left}
 <label><input type="radio" name="gear" value="weapon" onchange="toggleUI()"> 무기</label>
 </section>
 
-<section id="priceSection" class="locked">
+<section id="priceSection">
 <h2>재료 가격</h2>
 
 <div id="armorPrice">
-수호석 <input id="guardP" type="number" disabled>
-빙하 숨결 <input id="iceP" type="number" disabled>
-방어구 책 <input id="armorBookP" type="number" disabled>
+수호석 <input id="guardP" type="number">
+빙하 숨결 <input id="iceP" type="number">
+방어구 책 <input id="armorBookP" type="number">
 </div>
 
 <div id="weaponPrice" class="hidden">
-파괴석 <input id="destroyP" type="number" disabled>
-용암 숨결 <input id="lavaP" type="number" disabled>
-무기 책 <input id="weaponBookP" type="number" disabled>
+파괴석 <input id="destroyP" type="number">
+용암 숨결 <input id="lavaP" type="number">
+무기 책 <input id="weaponBookP" type="number">
 </div>
 
-돌파석 <input id="leapP" type="number" disabled>
-융화재료 <input id="fusionP" type="number" disabled>
+돌파석 <input id="leapP" type="number">
+융화재료 <input id="fusionP" type="number">
 </section>
 
 <section>
@@ -74,29 +71,15 @@ th:first-child,td:first-child{text-align:left}
 </section>
 
 <button onclick="run()">계산</button>
+
 <div id="result"></div>
 
 <script>
-const PASSWORD="1118";
-
-function toggleUI(){
-  const g=document.querySelector('input[name=gear]:checked').value;
-  armorPrice.classList.toggle("hidden",g!=="armor");
-  armorOwned.classList.toggle("hidden",g!=="armor");
-  weaponPrice.classList.toggle("hidden",g!=="weapon");
-  weaponOwned.classList.toggle("hidden",g!=="weapon");
-}
-
-function unlockPrice(){
-  if(prompt("비밀번호 입력")!==PASSWORD){alert("틀림");return;}
-  document.querySelectorAll("#priceSection input").forEach(i=>i.disabled=false);
-  priceSection.classList.remove("locked");
-}
-
+// ---------------- 공용 시세 ----------------
 async function loadSharedPrice(){
-  const res=await fetch("prices.json");
-  const d=await res.json();
-  const g=document.querySelector('input[name=gear]:checked').value;
+  const res = await fetch("prices.json");
+  const d = await res.json();
+  const g = document.querySelector('input[name=gear]:checked').value;
 
   if(g==="armor"){
     guardP.value=d.armor.guard;
@@ -112,25 +95,103 @@ async function loadSharedPrice(){
   priceInfo.innerText="공용 시세 기준일: "+d.updated;
 }
 
-function simulate(useBook){
-  let tries=20;
+function toggleUI(){
+  const g=document.querySelector('input[name=gear]:checked').value;
+  armorPrice.classList.toggle("hidden",g!=="armor");
+  armorOwned.classList.toggle("hidden",g!=="armor");
+  weaponPrice.classList.toggle("hidden",g!=="weapon");
+  weaponOwned.classList.toggle("hidden",g!=="weapon");
+}
+
+// ---------------- 기댓값 계산 엔진 ----------------
+
+// 기본 경험치
+const BASE_EXP = 13;
+
+// 확률 테이블 → 평균 배율
+function avgMultiplier(p){
+  return p.s*1 + p.b*2 + p.bb*3;
+}
+
+// 확률 정의
+const PROB = {
+  normal: { s:0.8, b:0.15, bb:0.05 },
+  breath: { s:0.5, b:0.3, bb:0.2 },
+  book:   { s:0.3, b:0.45, bb:0.25 },
+  both:   { s:0.0, b:0.6, bb:0.4 }
+};
+
+// 선조의 가호 기댓값 (6회당 1회)
+function ancestorExpBonus(){
+  // 평균 경험치 증가량
+  return (1/6) * (
+    0.125 * BASE_EXP*4 + // 갈라투르
+    0.25  * BASE_EXP*2 + // 겔라르
+    0.125 * 30 +         // 쿠훔바르
+    0.25  * 10           // 테메르
+  );
+}
+
+// 에베르 단계 상승 기댓값
+function ancestorStageSkip(){
+  return (1/6) * 0.125 * 1;
+}
+
+// 기댓값 시뮬레이션
+function simulate(strategy,gear){
+  let needStage = 10; // 20 → 30
+  let expPerTry;
+  let useBook=false, useBreath=false;
+
+  if(strategy==="normal"){
+    expPerTry = BASE_EXP * avgMultiplier(PROB.normal);
+  }
+  if(strategy==="bless"){
+    expPerTry = BASE_EXP * avgMultiplier(PROB.normal)
+      + ancestorExpBonus();
+  }
+  if(strategy==="always"){
+    expPerTry = BASE_EXP * avgMultiplier(PROB.both)
+      + ancestorExpBonus();
+    useBook=true; useBreath=true;
+  }
+
+  let stageSkip = ancestorStageSkip();
+  let effectiveStages = needStage - stageSkip;
+  let totalExp = effectiveStages * 1000;
+
+  let tries = totalExp / expPerTry;
+
   return {
     tries,
     use:{
-      guard:guardP?tries*1000:0,
-      destroy:destroyP?tries*1200:0,
-      leap:tries*20,
-      fusion:tries*20,
-      book:useBook?tries:0,
-      breath:useBook?tries:0
+      guard: gear==="armor"? tries*1000 : 0,
+      destroy: gear==="weapon"? tries*1200 : 0,
+      leap: gear==="armor"? tries*18 : tries*25,
+      fusion: gear==="armor"? tries*17 : tries*28,
+      book: useBook? tries : 0,
+      breath: useBreath? tries : 0
     }
   };
 }
 
-function calc(u,p,o){return Math.max(0,u-o)*p}
+// 비용 계산
+function cost(u,p,o){
+  const c=(n,o,p)=>Math.max(0,n-o)*p;
+  return{
+    guard:c(u.guard,o.guard,p.guard),
+    destroy:c(u.destroy,o.destroy,p.destroy),
+    leap:c(u.leap,o.leap,p.leap),
+    fusion:c(u.fusion,o.fusion,p.fusion),
+    book:c(u.book,o.book,p.book),
+    breath:c(u.breath,o.breath,p.breath)
+  };
+}
 
+// ---------------- 실행 ----------------
 function run(){
   const g=document.querySelector('input[name=gear]:checked').value;
+
   const price={
     guard:+guardP?.value||0,
     destroy:+destroyP?.value||0,
@@ -139,6 +200,7 @@ function run(){
     book:g==="armor"?+armorBookP.value:+weaponBookP.value,
     breath:g==="armor"?+iceP.value:+lavaP.value
   };
+
   const owned={
     guard:+guardO?.value||0,
     destroy:+destroyO?.value||0,
@@ -148,19 +210,30 @@ function run(){
     breath:g==="armor"?+iceO.value:+lavaO.value
   };
 
+  const goldBase = g==="armor"?2000:3000;
+
+  const strategies=[
+    {k:"normal",n:"일반"},
+    {k:"bless",n:"가호 때만"},
+    {k:"always",n:"항상"}
+  ];
+
   let html="";
-  ["일반","가호","항상"].forEach((n,i)=>{
-    const r=simulate(i>0);
-    const total=
-      r.tries*(g==="armor"?2000:3000)+
-      calc(r.use.guard,owned.guard,price.guard)+
-      calc(r.use.destroy,owned.destroy,price.destroy)+
-      calc(r.use.leap,owned.leap,price.leap)+
-      calc(r.use.fusion,owned.fusion,price.fusion)+
-      calc(r.use.book,owned.book,price.book)+
-      calc(r.use.breath,owned.breath,price.breath);
-    html+=`<section><h2>${n}</h2>총 골드 ${total.toLocaleString()}</section>`;
+  strategies.forEach(s=>{
+    const r=simulate(s.k,g);
+    const c=cost(r.use,price,owned);
+    const total =
+      r.tries*goldBase +
+      Object.values(c).reduce((a,b)=>a+b,0);
+
+    html+=`
+    <section>
+    <h2>${s.n}</h2>
+    <div>평균 재련 횟수: ${r.tries.toFixed(1)}회</div>
+    <div>총 골드: ${Math.round(total).toLocaleString()}</div>
+    </section>`;
   });
+
   result.innerHTML=html;
 }
 </script>
