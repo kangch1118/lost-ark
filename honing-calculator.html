@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>로스트아크 상급재련 20~30 계산기 (안정판)</title>
+<title>로스트아크 상급재련 20~30 계산기 (최종)</title>
 <style>
 body{background:#111;color:#eee;font-family:Arial;padding:20px}
 h1,h2,h3{color:#ffd700}
@@ -14,59 +14,126 @@ th,td{border:1px solid #444;padding:6px;text-align:right}
 th{background:#222}
 th:first-child,td:first-child{text-align:left}
 .hidden{display:none}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+.note{color:#aaa;font-size:13px}
 </style>
 </head>
 <body>
 
-<h1>상급재련 20~30 계산기 (안정판)</h1>
+<div class="top">
+  <h1>상급재련 20~30 계산기 (최종)</h1>
+  <div>
+    <button onclick="loadSharedPrice()">🌐 시세 불러오기</button>
+    <button onclick="unlockManual()">🔒 수동 입력</button>
+  </div>
+</div>
+<div id="priceInfo" class="note"></div>
 
 <section>
+<h2>장비 선택</h2>
 <label><input type="radio" name="gear" value="armor" checked onchange="toggleUI()"> 방어구</label>
 <label><input type="radio" name="gear" value="weapon" onchange="toggleUI()"> 무기</label>
 </section>
 
 <section>
 <h2>재료 가격</h2>
+
 <div id="armorPrice">
-수호석 <input id="guardP" type="number"><br>
-빙하 숨결 <input id="iceP" type="number"><br>
-방어구 책 <input id="armorBookP" type="number">
+수호석 <input id="guardP" type="number" disabled><br>
+빙하 숨결 <input id="iceP" type="number" disabled><br>
+방어구 책 <input id="armorBookP" type="number" disabled>
 </div>
+
 <div id="weaponPrice" class="hidden">
-파괴석 <input id="destroyP" type="number"><br>
-용암 숨결 <input id="lavaP" type="number"><br>
-무기 책 <input id="weaponBookP" type="number">
+파괴석 <input id="destroyP" type="number" disabled><br>
+용암 숨결 <input id="lavaP" type="number" disabled><br>
+무기 책 <input id="weaponBookP" type="number" disabled>
 </div>
-돌파석 <input id="leapP" type="number"><br>
-융화재료 <input id="fusionP" type="number">
+
+돌파석 <input id="leapP" type="number" disabled><br>
+융화재료 <input id="fusionP" type="number" disabled>
+</section>
+
+<section>
+<h2>보유 수량</h2>
+
+<div id="armorOwned">
+수호석 <input id="guardO" type="number" value="0"><br>
+빙하 숨결 <input id="iceO" type="number" value="0"><br>
+방어구 책 <input id="armorBookO" type="number" value="0">
+</div>
+
+<div id="weaponOwned" class="hidden">
+파괴석 <input id="destroyO" type="number" value="0"><br>
+용암 숨결 <input id="lavaO" type="number" value="0"><br>
+무기 책 <input id="weaponBookO" type="number" value="0">
+</div>
+
+돌파석 <input id="leapO" type="number" value="0"><br>
+융화재료 <input id="fusionO" type="number" value="0">
 </section>
 
 <button onclick="run()">계산</button>
+
 <div id="result"></div>
 
 <script>
+const ADMIN_PASSWORD = "1118";
+
+/* ---------- UI ---------- */
 function toggleUI(){
   const g=document.querySelector('input[name=gear]:checked').value;
   armorPrice.classList.toggle("hidden",g!=="armor");
+  armorOwned.classList.toggle("hidden",g!=="armor");
   weaponPrice.classList.toggle("hidden",g!=="weapon");
+  weaponOwned.classList.toggle("hidden",g!=="weapon");
 }
 
-/* 기준값 (정규화) */
-const BASE_TRIES_PER_STAGE = 6;
+/* ---------- 시세 ---------- */
+async function loadSharedPrice(){
+  const res = await fetch("prices.json");
+  const d = await res.json();
+  const g = document.querySelector('input[name=gear]:checked').value;
+
+  if(g==="armor"){
+    guardP.value=d.armor.guard;
+    iceP.value=d.armor.breath;
+    armorBookP.value=d.armor.book;
+  }else{
+    destroyP.value=d.weapon.destroy;
+    lavaP.value=d.weapon.breath;
+    weaponBookP.value=d.weapon.book;
+  }
+  leapP.value=d.armor.leap;
+  fusionP.value=d.armor.fusion;
+  priceInfo.innerText="공용 시세 기준일: "+d.updated;
+}
+
+/* ---------- 수동 입력 ---------- */
+function unlockManual(){
+  const pw = prompt("비밀번호 입력");
+  if(pw!==ADMIN_PASSWORD){alert("비밀번호 오류");return;}
+  document.querySelectorAll("input[type=number]").forEach(i=>i.disabled=false);
+}
+
+/* ---------- 계산 기준 ---------- */
+/* 정규화 기준: 일반 전략 1단계 평균 6회 */
+const BASE_TRIES = 6;
 
 /* 전략별 상대 효율 */
 const STRATEGY = {
   normal: 1.00,
-  bless: 0.82,
-  always: 0.68
+  bless: 0.85,
+  always: 0.70
 };
 
 function run(){
   const g=document.querySelector('input[name=gear]:checked').value;
+
   const goldBase = g==="armor"?2000:3000;
-  const stone = g==="armor"?1000:1200;
-  const leap = g==="armor"?18:25;
-  const fusion = g==="armor"?17:28;
+  const stoneUse = g==="armor"?1000:1200;
+  const leapUse = g==="armor"?18:25;
+  const fusionUse = g==="armor"?17:28;
 
   const price={
     guard:+guardP?.value||0,
@@ -77,24 +144,40 @@ function run(){
     breath:g==="armor"?+iceP.value:+lavaP.value
   };
 
+  const owned={
+    guard:+guardO?.value||0,
+    destroy:+destroyO?.value||0,
+    leap:+leapO.value||0,
+    fusion:+fusionO.value||0,
+    book:g==="armor"?+armorBookO.value:+weaponBookO.value,
+    breath:g==="armor"?+iceO.value:+lavaO.value
+  };
+
   const strategies=[
-    {k:"normal",n:"① 일반"},
-    {k:"bless",n:"② 가호 때만"},
-    {k:"always",n:"③ 항상 책+숨결"}
+    {k:"normal",n:"① 일반",useBook:false},
+    {k:"bless",n:"② 가호 때만",useBook:true},
+    {k:"always",n:"③ 항상 책+숨결",useBook:true}
   ];
 
   let html="";
+
   strategies.forEach(s=>{
     html+=`<section><h2>${s.n}</h2><table>
-    <tr><th>단계</th><th>재련 횟수</th><th>강화 골드</th><th>돌파석</th><th>융화재료</th></tr>`;
+    <tr>
+      <th>단계</th>
+      <th>재련 횟수</th>
+      <th>강화 골드</th>
+      <th>돌파석</th>
+      <th>융화재료</th>
+    </tr>`;
 
     let totalGold=0;
 
     for(let i=20;i<30;i++){
-      const tries = BASE_TRIES_PER_STAGE * STRATEGY[s.k];
+      const tries = BASE_TRIES * STRATEGY[s.k];
       const gold = tries * goldBase;
-      const leapUse = tries * leap;
-      const fusionUse = tries * fusion;
+      const leap = tries * leapUse;
+      const fusion = tries * fusionUse;
 
       totalGold += gold;
 
@@ -103,22 +186,23 @@ function run(){
         <td>${i} → ${i+1}</td>
         <td>${tries.toFixed(2)}</td>
         <td>${Math.round(gold).toLocaleString()}</td>
-        <td>${leapUse.toFixed(1)}</td>
-        <td>${fusionUse.toFixed(1)}</td>
+        <td>${leap.toFixed(1)}</td>
+        <td>${fusion.toFixed(1)}</td>
       </tr>`;
     }
 
     html+=`
-      <tr>
-        <th colspan="2">총합</th>
-        <th>${Math.round(totalGold).toLocaleString()}</th>
-        <th colspan="2"></th>
-      </tr>
+    <tr>
+      <th colspan="2">총 골드</th>
+      <th>${Math.round(totalGold).toLocaleString()}</th>
+      <th colspan="2"></th>
+    </tr>
     </table></section>`;
   });
 
   result.innerHTML=html;
 }
 </script>
+
 </body>
 </html>
