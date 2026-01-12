@@ -1,0 +1,42 @@
+{
+  "_comment": "로스트아크 상급재련 계산기 공용 시세 파일",
+  "_updated_desc": "시세 기준 날짜 (YYYY-MM-DD)",
+
+  "updated": "2026-01-13",
+
+  "_armor_desc": "방어구 상급재련 관련 시세",
+  "armor": {
+    "_guard_desc": "운명의 수호석 개당 가격",
+    "guard": 10,
+
+    "_leap_desc": "운명의 돌파석 개당 가격",
+    "leap": 100,
+
+    "_fusion_desc": "아비도스 융화재료 개당 가격",
+    "fusion": 300,
+
+    "_book_desc": "방어구 상급재련 책 개당 가격",
+    "book": 5000,
+
+    "_breath_desc": "빙하의 숨결 개당 가격 (방어구용)",
+    "breath": 1000
+  },
+
+  "_weapon_desc": "무기 상급재련 관련 시세",
+  "weapon": {
+    "_destroy_desc": "운명의 파괴석 개당 가격",
+    "destroy": 11,
+
+    "_leap_desc": "운명의 돌파석 개당 가격",
+    "leap": 100,
+
+    "_fusion_desc": "아비도스 융화재료 개당 가격",
+    "fusion": 300,
+
+    "_book_desc": "무기 상급재련 책 개당 가격",
+    "book": 8000,
+
+    "_breath_desc": "용암의 숨결 개당 가격 (무기용)",
+    "breath": 1200
+  }
+}
