@@ -5,10 +5,13 @@
 <title>상급재련 계산기</title>
 <style>
 body{background:#111;color:#eee;font-family:Arial;padding:20px}
-section{border:1px solid #333;padding:15px;margin-bottom:20px}
+section{border:1px solid #333;padding:12px;margin-bottom:18px}
 h2{color:#ffd700}
 button,input{padding:6px;margin:4px}
 button{background:#ffd700;border:none;font-weight:bold;cursor:pointer}
+table{border-collapse:collapse;width:100%;margin-top:10px}
+th,td{border:1px solid #444;padding:6px;text-align:right}
+th:first-child,td:first-child{text-align:left}
 .hidden{display:none}
 .note{color:#aaa;font-size:13px}
 </style>
@@ -28,38 +31,32 @@ button{background:#ffd700;border:none;font-weight:bold;cursor:pointer}
 
 <section>
 <h2>재료 가격</h2>
-
 <div id="armorPrice">
 수호석 <input id="guardP" type="number" disabled>
-빙하의 숨결 <input id="iceP" type="number" disabled>
-방어구 책 <input id="armorBookP" type="number" disabled>
+빙하숨결 <input id="iceP" type="number" disabled>
+방어구책 <input id="armorBookP" type="number" disabled>
 </div>
-
 <div id="weaponPrice" class="hidden">
 파괴석 <input id="destroyP" type="number" disabled>
-용암의 숨결 <input id="lavaP" type="number" disabled>
-무기 책 <input id="weaponBookP" type="number" disabled>
+용암숨결 <input id="lavaP" type="number" disabled>
+무기책 <input id="weaponBookP" type="number" disabled>
 </div>
-
 돌파석 <input id="leapP" type="number" disabled>
 융화재료 <input id="fusionP" type="number" disabled>
 </section>
 
 <section>
 <h2>보유 수량</h2>
-
 <div id="armorOwned">
 수호석 <input id="guardO" type="number" value="0">
-빙하의 숨결 <input id="iceO" type="number" value="0">
-방어구 책 <input id="armorBookO" type="number" value="0">
+빙하숨결 <input id="iceO" type="number" value="0">
+방어구책 <input id="armorBookO" type="number" value="0">
 </div>
-
 <div id="weaponOwned" class="hidden">
 파괴석 <input id="destroyO" type="number" value="0">
-용암의 숨결 <input id="lavaO" type="number" value="0">
-무기 책 <input id="weaponBookO" type="number" value="0">
+용암숨결 <input id="lavaO" type="number" value="0">
+무기책 <input id="weaponBookO" type="number" value="0">
 </div>
-
 돌파석 <input id="leapO" type="number" value="0">
 융화재료 <input id="fusionO" type="number" value="0">
 </section>
@@ -68,20 +65,20 @@ button{background:#ffd700;border:none;font-weight:bold;cursor:pointer}
 <div id="result"></div>
 
 <script>
-/* ================= 기본 ================= */
+/* ================= 공통 ================= */
 const ADMIN_PW="1118";
 const TOTAL_EXP=1000;
 
-/* 확률 */
+/* 성공 확률 */
 const PROB_NORMAL=[{e:10,p:0.8},{e:20,p:0.15},{e:40,p:0.05}];
 const PROB_BOTH=[{e:20,p:0.6},{e:40,p:0.4}];
 
-/* 선조 */
+/* 선조 (6번째 재련에 확정 발동, 종류만 확률) */
 const ANCESTOR=[
  {p:0.125,type:"mul",v:7},
- {p:0.25,type:"mul",v:5},
+ {p:0.25 ,type:"mul",v:5},
  {p:0.125,type:"add",v:80},
- {p:0.25,type:"add",v:30},
+ {p:0.25 ,type:"add",v:30},
  {p:0.125,type:"skip"},
  {p:0.125,type:"naver"}
 ];
@@ -94,31 +91,31 @@ function toggle(){
   weaponPrice.classList.toggle("hidden",g!=="weapon");
   weaponOwned.classList.toggle("hidden",g!=="weapon");
 }
-
 function unlock(){
   if(prompt("비밀번호")!==ADMIN_PW){alert("오류");return;}
   document.querySelectorAll("input[type=number]").forEach(i=>i.disabled=false);
 }
-
 async function loadPrices(){
   const r=await fetch("prices.json");
   const d=await r.json();
-
   guardP.value=d.armor.guard;
   iceP.value=d.armor.breath;
   armorBookP.value=d.armor.book;
-
   destroyP.value=d.weapon.destroy;
   lavaP.value=d.weapon.breath;
   weaponBookP.value=d.weapon.book;
-
   leapP.value=d.armor.leap;
   fusionP.value=d.armor.fusion;
-
   priceInfo.innerText="시세 기준: "+d.updated;
 }
 
-/* ================= 계산 ================= */
+/* ================= Solver ================= */
+/*
+상태: (exp, cnt, naver)
+exp: 누적 경험치
+cnt: 0~5 (5면 이번이 선조 재련)
+naver: 다음 선조 강화 여부
+*/
 function run(){
   const gear=document.querySelector('input[name=gear]:checked').value;
 
@@ -130,7 +127,6 @@ function run(){
     book:gear==="armor"?+armorBookP.value:+weaponBookP.value,
     breath:gear==="armor"?+iceP.value:+lavaP.value
   };
-
   const owned={
     guard:+guardO?.value||0,
     destroy:+destroyO?.value||0,
@@ -139,10 +135,9 @@ function run(){
     book:gear==="armor"?+armorBookO.value:+weaponBookO.value,
     breath:gear==="armor"?+iceO.value:+lavaO.value
   };
-
-  const cost = gear==="armor"
-    ? {gold:2000, guard:1000, leap:18, fusion:17}
-    : {gold:3000, destroy:1200, leap:25, fusion:28};
+  const cost=gear==="armor"
+    ? {gold:2000,guard:1000,leap:18,fusion:17}
+    : {gold:3000,destroy:1200,leap:25,fusion:28};
 
   const strategies=[
     {k:"normal",n:"일반"},
@@ -155,24 +150,23 @@ function run(){
     const r=solve(s.k,cost,price,owned);
     html+=`<section>
       <h2>${s.n}</h2>
-      재련 횟수 기댓값: ${r.t.toFixed(2)}<br>
-      총 골드: <b>${Math.round(r.g).toLocaleString()}</b>
+      평균 재련 횟수: ${r.totalTries.toFixed(2)}<br>
+      총 골드: <b>${Math.round(r.totalGold).toLocaleString()}</b>
+      ${r.table}
     </section>`;
   });
-
   result.innerHTML=html;
 }
 
-/* ================= Solver ================= */
 function solve(strategy,cost,price,owned){
   const memo=new Map();
-  function key(e,a,n){return e+"|"+a+"|"+(n?1:0);}
+  function key(e,c,n){return e+"|"+c+"|"+(n?1:0);}
 
-  function dfs(exp,anc,nav){
+  function dfs(exp,cnt,nav){
     if(exp>=TOTAL_EXP){
-      return {t:0,g:0,m:{guard:0,destroy:0,leap:0,fusion:0,book:0,breath:0}};
+      return {t:0,g:0,m:{},steps:Array(10).fill(0)};
     }
-    const k=key(exp,anc,nav);
+    const k=key(exp,cnt,nav);
     if(memo.has(k)) return memo.get(k);
 
     let res={
@@ -185,36 +179,48 @@ function solve(strategy,cost,price,owned){
         fusion:cost.fusion,
         book:0,
         breath:0
-      }
+      },
+      steps:Array(10).fill(0)
     };
 
-    const isAnc=(anc===5);
-    const useBoth=(strategy==="always")||(strategy==="bless"&&isAnc);
+    const isAncestor=(cnt===5);
+    const useBoth=(strategy==="always")||(strategy==="bless"&&isAncestor);
     if(useBoth){res.m.book+=1;res.m.breath+=20;}
 
     const table=useBoth?PROB_BOTH:PROB_NORMAL;
 
     table.forEach(r=>{
-      if(isAnc){
-        ANCESTOR.forEach(a=>{
-          let ne=exp,na=(anc+1)%6,nn=nav,g=r.e;
-          if(a.type==="mul")g*=a.v;
-          if(a.type==="add")g+=a.v;
-          if(a.type==="skip")ne=TOTAL_EXP;
-          if(a.type==="naver")nn=true;
-          if(a.type!=="skip")ne+=g;
-          if(nav&&a.type!=="naver")nn=false;
+      let baseExp=r.e;
+      let nextCnt=(cnt+1)%6;
 
-          const sub=dfs(ne,na,nn);
+      if(isAncestor){
+        ANCESTOR.forEach(a=>{
+          let ne=exp, nn=nav;
+          let gain=baseExp;
+          if(a.type==="mul") gain*=a.v;
+          if(a.type==="add") gain+=a.v;
+          if(a.type==="skip"){ ne=TOTAL_EXP; }
+          if(a.type==="naver") nn=true;
+          if(a.type!=="skip") ne+=gain;
+          if(nav && a.type!=="naver") nn=false;
+
+          const sub=dfs(ne,nextCnt,nn);
           res.t+=r.p*a.p*sub.t;
           res.g+=r.p*a.p*sub.g;
-          Object.keys(res.m).forEach(x=>res.m[x]+=r.p*a.p*sub.m[x]);
+          Object.keys(res.m).forEach(x=>res.m[x]+=r.p*a.p*(sub.m[x]||0));
+          sub.steps.forEach((v,i)=>res.steps[i]+=r.p*a.p*v);
+          const stage=Math.min(9,Math.floor(ne/100));
+          res.steps[stage]+=r.p*a.p;
         });
       }else{
-        const sub=dfs(exp+r.e,(anc+1)%6,nav);
+        const ne=exp+baseExp;
+        const sub=dfs(ne,nextCnt,nav);
         res.t+=r.p*sub.t;
         res.g+=r.p*sub.g;
-        Object.keys(res.m).forEach(x=>res.m[x]+=r.p*sub.m[x]);
+        Object.keys(res.m).forEach(x=>res.m[x]+=r.p*(sub.m[x]||0));
+        sub.steps.forEach((v,i)=>res.steps[i]+=r.p*v);
+        const stage=Math.min(9,Math.floor(ne/100));
+        res.steps[stage]+=r.p;
       }
     });
 
@@ -224,13 +230,19 @@ function solve(strategy,cost,price,owned){
 
   const r=dfs(0,0,false);
 
-  let total=r.g;
+  let totalGold=r.g;
   Object.keys(r.m).forEach(x=>{
     const need=Math.max(0,(r.m[x]||0)-(owned[x]||0));
-    total+=need*(price[x]||0);
+    totalGold+=need*(price[x]||0);
   });
 
-  return {t:r.t,g:total};
+  let table="<table><tr><th>구간</th><th>기대 횟수</th></tr>";
+  r.steps.forEach((v,i)=>{
+    table+=`<tr><td>${20+i}→${21+i}</td><td>${v.toFixed(2)}</td></tr>`;
+  });
+  table+="</table>";
+
+  return {totalTries:r.t,totalGold,table};
 }
 </script>
 
