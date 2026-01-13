@@ -126,7 +126,8 @@ function toggle(){
   weaponOwned.classList.toggle("hidden",g!=="weapon");
 }
 
-/* ===== 시뮬레이션 1회 ===== */
+/* ================= 시뮬레이션 ================= */
+
 function simulateOnce(strategy, gear, cost){
   let exp=0, tries=0;
   let natural=0, recharge=false, enhanced=false;
@@ -177,7 +178,6 @@ function simulateOnce(strategy, gear, cost){
   return {tries,gold,mats};
 }
 
-/* ===== 5회 평균 ===== */
 function simulateAverage(strategy, gear, cost){
   let sum={tries:0,gold:0,mats:{guard:0,destroy:0,leap:0,fusion:0,book:0,breath:0}};
   for(let i=0;i<SIM_COUNT;i++){
@@ -192,6 +192,8 @@ function simulateAverage(strategy, gear, cost){
   return sum;
 }
 
+/* ================= 결과 출력 ================= */
+
 function run(){
   const gear=document.querySelector('input[name=gear]:checked').value;
   const cost = gear==="armor"
@@ -199,17 +201,12 @@ function run(){
     : {gold:3000,main:"destroy",mainAmt:1200,leap:25,fusion:28};
 
   const price={
-    guard:+guardP.value||0,destroy:+destroyP.value||0,
-    leap:+leapP.value||0,fusion:+fusionP.value||0,
+    guard:+guardP.value||0,
+    destroy:+destroyP.value||0,
+    leap:+leapP.value||0,
+    fusion:+fusionP.value||0,
     book:gear==="armor"?+armorBookP.value:+weaponBookP.value,
     breath:gear==="armor"?+iceP.value:+lavaP.value
-  };
-
-  const owned={
-    guard:+guardO.value||0,destroy:+destroyO.value||0,
-    leap:+leapO.value||0,fusion:+fusionO.value||0,
-    book:gear==="armor"?+armorBookO.value:+weaponBookO.value,
-    breath:gear==="armor"?+iceO.value:+lavaO.value
   };
 
   const strategies=[
@@ -220,6 +217,16 @@ function run(){
 
   let html="";
   strategies.forEach(s=>{
+    // 🔧 여기서 전략마다 보유 재료를 새로 복사
+    const ownedLocal={
+      guard:+guardO.value||0,
+      destroy:+destroyO.value||0,
+      leap:+leapO.value||0,
+      fusion:+fusionO.value||0,
+      book:gear==="armor"?+armorBookO.value:+weaponBookO.value,
+      breath:gear==="armor"?+iceO.value:+lavaO.value
+    };
+
     const r=simulateAverage(s.k,gear,cost);
     let total=r.gold;
     let rows=`
@@ -230,16 +237,24 @@ function run(){
       </tr>`;
 
     function add(name,key){
-      const need=Math.max(0,r.mats[key]-owned[key]);
+      const need=Math.max(0,r.mats[key]-ownedLocal[key]);
       const g=need*price[key];
       total+=g;
-      rows+=`<tr><td>${name}</td><td>${r.mats[key].toFixed(1)}</td><td>${Math.round(g).toLocaleString()}</td></tr>`;
+      rows+=`
+        <tr>
+          <td>${name}</td>
+          <td>${r.mats[key].toFixed(1)}</td>
+          <td>${Math.round(g).toLocaleString()}</td>
+        </tr>`;
     }
 
     add(cost.main==="guard"?"수호석":"파괴석",cost.main);
     add("돌파석","leap");
     add("융화재료","fusion");
-    if(r.mats.book>0){ add("재련서","book"); add("숨결","breath"); }
+    if(r.mats.book>0){
+      add("재련서","book");
+      add("숨결","breath");
+    }
 
     html+=`
     <section>
