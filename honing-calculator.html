@@ -5,8 +5,7 @@
 <title>상급재련 21–30 단계 강화표</title>
 <style>
 body{
-  background:#0f1115;
-  color:#eaeaea;
+  background:#0f1115;color:#eaeaea;
   font-family:Pretendard,Arial,sans-serif;
   padding:24px
 }
@@ -15,8 +14,7 @@ section{
   background:#171a21;
   border-radius:16px;
   padding:18px;
-  margin-bottom:18px;
-  box-shadow:0 6px 16px rgba(0,0,0,.25)
+  margin-bottom:18px
 }
 h2{color:#ffd966;margin-top:0}
 .flex{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
@@ -26,13 +24,11 @@ button{
   padding:10px 16px;
   font-weight:700;cursor:pointer
 }
-button:hover{background:#ffe699}
 input{
   background:#0f1115;color:#eaeaea;
   border:1px solid #333;
   border-radius:10px;
-  padding:6px 10px;
-  width:110px
+  padding:6px 10px;width:110px
 }
 table{
   width:100%;border-collapse:collapse;margin-top:12px
@@ -43,7 +39,7 @@ th,td{
 }
 th:first-child,td:first-child{text-align:left}
 .hidden{display:none}
-.note{color:#aaa;font-size:13px}
+.note{color:#aaa;font-size:12px;text-align:right}
 </style>
 </head>
 <body>
@@ -52,30 +48,28 @@ th:first-child,td:first-child{text-align:left}
 
 <section class="flex">
   <button onclick="loadPrices()">시세 불러오기</button>
-  <button onclick="unlock()">시세 수동 입력</button>
-  <span id="priceInfo" class="note"></span>
 </section>
 
 <section>
-  <label><input type="radio" name="gear" value="armor" checked onchange="toggle()"> 방어구</label>
-  <label><input type="radio" name="gear" value="weapon" onchange="toggle()"> 무기</label>
+<label><input type="radio" name="gear" value="armor" checked onchange="toggle()"> 방어구</label>
+<label><input type="radio" name="gear" value="weapon" onchange="toggle()"> 무기</label>
 </section>
 
 <section>
 <h2>재료 가격</h2>
 <div id="armorPrice" class="flex">
-수호석 <input id="guardP" type="number" disabled>
-빙하의 숨결 <input id="iceP" type="number" disabled>
-방어구 재련서 <input id="armorBookP" type="number" disabled>
+수호석 <input id="guardP" type="number">
+빙하숨결 <input id="iceP" type="number">
+방어구책 <input id="armorBookP" type="number">
 </div>
 <div id="weaponPrice" class="flex hidden">
-파괴석 <input id="destroyP" type="number" disabled>
-용암의 숨결 <input id="lavaP" type="number" disabled>
-무기 재련서 <input id="weaponBookP" type="number" disabled>
+파괴석 <input id="destroyP" type="number">
+용암숨결 <input id="lavaP" type="number">
+무기책 <input id="weaponBookP" type="number">
 </div>
 <div class="flex">
-돌파석 <input id="leapP" type="number" disabled>
-융화재료 <input id="fusionP" type="number" disabled>
+돌파석 <input id="leapP" type="number">
+융화재료 <input id="fusionP" type="number">
 </div>
 </section>
 
@@ -83,13 +77,13 @@ th:first-child,td:first-child{text-align:left}
 <h2>보유 수량</h2>
 <div id="armorOwned" class="flex">
 수호석 <input id="guardO" type="number" value="0">
-빙하의 숨결 <input id="iceO" type="number" value="0">
-방어구 재련서 <input id="armorBookO" type="number" value="0">
+빙하숨결 <input id="iceO" type="number" value="0">
+방어구책 <input id="armorBookO" type="number" value="0">
 </div>
 <div id="weaponOwned" class="flex hidden">
 파괴석 <input id="destroyO" type="number" value="0">
-용암의 숨결 <input id="lavaO" type="number" value="0">
-무기 재련서 <input id="weaponBookO" type="number" value="0">
+용암숨결 <input id="lavaO" type="number" value="0">
+무기책 <input id="weaponBookO" type="number" value="0">
 </div>
 <div class="flex">
 돌파석 <input id="leapO" type="number" value="0">
@@ -103,17 +97,22 @@ th:first-child,td:first-child{text-align:left}
 
 <div id="result"></div>
 
-<script>
-/* ===== 설정 ===== */
-const ADMIN_PW="1118";
-const TOTAL_EXP=1000;
+<div class="note">이 계산기를 니나브 서버의 애교많은년을 위해 헌정합니다</div>
 
-/* 전략별 1회 기대 경험치 (확정값) */
-const EXP_EXPECT={
-  normal:18,
-  bless:19.33,
-  always:26
-};
+<script>
+const TOTAL_EXP = 1000;
+
+async function loadPrices(){
+  const d = await (await fetch("prices.json")).json();
+  guardP.value=d.armor.guard;
+  iceP.value=d.armor.breath;
+  armorBookP.value=d.armor.book;
+  destroyP.value=d.weapon.destroy;
+  lavaP.value=d.weapon.breath;
+  weaponBookP.value=d.weapon.book;
+  leapP.value=d.armor.leap;
+  fusionP.value=d.armor.fusion;
+}
 
 function toggle(){
   const g=document.querySelector('input[name=gear]:checked').value;
@@ -123,33 +122,15 @@ function toggle(){
   weaponOwned.classList.toggle("hidden",g!=="weapon");
 }
 
-function unlock(){
-  if(prompt("비밀번호 입력")!==ADMIN_PW){
-    alert("비밀번호가 틀렸습니다"); return;
-  }
-  document.querySelectorAll("input[type=number]").forEach(i=>i.disabled=false);
-}
-
-async function loadPrices(){
-  const r=await fetch("prices.json");
-  const d=await r.json();
-
-  guardP.value=d.armor.guard;
-  iceP.value=d.armor.breath;
-  armorBookP.value=d.armor.book;
-
-  destroyP.value=d.weapon.destroy;
-  lavaP.value=d.weapon.breath;
-  weaponBookP.value=d.weapon.book;
-
-  leapP.value=d.armor.leap;
-  fusionP.value=d.armor.fusion;
-
-  priceInfo.textContent="시세 기준: "+d.updated;
-}
-
 function run(){
   const gear=document.querySelector('input[name=gear]:checked').value;
+
+  // 최종 합의된 기댓값 (상태 기반 계산 결과)
+  const expPerTry = {
+    normal: 23.9,
+    bless: 30.6,
+    always: 46.4
+  };
 
   const cost = gear==="armor"
     ? {gold:2000, main:"guard", mainAmt:1000, leap:18, fusion:17}
@@ -175,17 +156,17 @@ function run(){
 
   const strategies=[
     {k:"normal",n:"일반"},
-    {k:"bless",n:"가호때만"},
-    {k:"always",n:"항상"}
+    {k:"bless",n:"선조 턴만 책·숨결"},
+    {k:"always",n:"항상 책·숨결"}
   ];
 
   let html="";
   strategies.forEach(s=>{
-    const tries=TOTAL_EXP/EXP_EXPECT[s.k];
-    const bookCnt=s.k==="always"?tries:s.k==="bless"?tries/6:0;
-    const breathCnt=bookCnt*20;
+    const tries = TOTAL_EXP / expPerTry[s.k];
+    const bookCnt = s.k==="always" ? tries : s.k==="bless" ? tries/6 : 0;
+    const breathCnt = bookCnt * 20;
 
-    let totalGold=tries*cost.gold;
+    let totalGold = tries * cost.gold;
     let rows="";
 
     function add(name,key,amount){
