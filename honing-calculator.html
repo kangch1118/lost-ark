@@ -5,7 +5,8 @@
 <title>상급재련 21–30 단계 강화표</title>
 <style>
 body{
-  background:#0f1115;color:#eaeaea;
+  background:#0f1115;
+  color:#eaeaea;
   font-family:Pretendard,Arial,sans-serif;
   padding:24px
 }
@@ -14,7 +15,8 @@ section{
   background:#171a21;
   border-radius:16px;
   padding:18px;
-  margin-bottom:18px
+  margin-bottom:18px;
+  box-shadow:0 6px 16px rgba(0,0,0,.25)
 }
 h2{color:#ffd966;margin-top:0}
 .flex{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
@@ -28,7 +30,8 @@ input{
   background:#0f1115;color:#eaeaea;
   border:1px solid #333;
   border-radius:10px;
-  padding:6px 10px;width:110px
+  padding:6px 10px;
+  width:110px
 }
 table{
   width:100%;border-collapse:collapse;margin-top:12px
@@ -101,6 +104,7 @@ th:first-child,td:first-child{text-align:left}
 
 <script>
 const TOTAL_EXP = 1000;
+const SIM_COUNT = 5;
 
 async function loadPrices(){
   const d = await (await fetch("prices.json")).json();
@@ -122,34 +126,88 @@ function toggle(){
   weaponOwned.classList.toggle("hidden",g!=="weapon");
 }
 
+/* ===== 시뮬레이션 1회 ===== */
+function simulateOnce(strategy, gear, cost){
+  let exp=0, tries=0;
+  let natural=0, recharge=false, enhanced=false;
+
+  let mats={guard:0,destroy:0,leap:0,fusion:0,book:0,breath:0};
+  let gold=0;
+
+  while(exp<TOTAL_EXP){
+    tries++;
+    gold+=cost.gold;
+
+    let isAncestor = recharge || natural===5;
+    recharge=false;
+
+    mats[cost.main]+=cost.mainAmt;
+    mats.leap+=cost.leap;
+    mats.fusion+=cost.fusion;
+
+    let useBook = strategy==="always" || (strategy==="bless" && isAncestor);
+    if(useBook){ mats.book++; mats.breath+=20; }
+
+    let r=Math.random(), gain=0;
+    if(useBook) gain = r<0.6?20:40;
+    else gain = r<0.8?10:r<0.95?20:40;
+
+    if(isAncestor){
+      let a=Math.random();
+      if(enhanced){
+        if(a<0.2) gain*=7;
+        else if(a<0.4) gain*=5;
+        else if(a<0.6){ gain+=80; recharge=true; }
+        else if(a<0.8){ gain+=30; }
+        else{ exp+=200; gain=0; }
+        enhanced=false;
+      }else{
+        if(a<1/6) gain*=5;
+        else if(a<2/6) gain*=3;
+        else if(a<3/6){ gain+=30; recharge=true; }
+        else if(a<4/6){ gain+=10; }
+        else if(a<5/6){ recharge=true; enhanced=true; gain=0; }
+        else{ exp+=100; gain=0; }
+      }
+      natural=0;
+    }else natural++;
+
+    exp+=gain;
+  }
+  return {tries,gold,mats};
+}
+
+/* ===== 5회 평균 ===== */
+function simulateAverage(strategy, gear, cost){
+  let sum={tries:0,gold:0,mats:{guard:0,destroy:0,leap:0,fusion:0,book:0,breath:0}};
+  for(let i=0;i<SIM_COUNT;i++){
+    const r=simulateOnce(strategy,gear,cost);
+    sum.tries+=r.tries;
+    sum.gold+=r.gold;
+    for(let k in sum.mats) sum.mats[k]+=r.mats[k];
+  }
+  sum.tries/=SIM_COUNT;
+  sum.gold/=SIM_COUNT;
+  for(let k in sum.mats) sum.mats[k]/=SIM_COUNT;
+  return sum;
+}
+
 function run(){
   const gear=document.querySelector('input[name=gear]:checked').value;
-
-  // 최종 합의된 기댓값 (상태 기반 계산 결과)
-  const expPerTry = {
-    normal: 23.9,
-    bless: 30.6,
-    always: 46.4
-  };
-
   const cost = gear==="armor"
-    ? {gold:2000, main:"guard", mainAmt:1000, leap:18, fusion:17}
-    : {gold:3000, main:"destroy", mainAmt:1200, leap:25, fusion:28};
+    ? {gold:2000,main:"guard",mainAmt:1000,leap:18,fusion:17}
+    : {gold:3000,main:"destroy",mainAmt:1200,leap:25,fusion:28};
 
   const price={
-    guard:+guardP?.value||0,
-    destroy:+destroyP?.value||0,
-    leap:+leapP.value||0,
-    fusion:+fusionP.value||0,
+    guard:+guardP.value||0,destroy:+destroyP.value||0,
+    leap:+leapP.value||0,fusion:+fusionP.value||0,
     book:gear==="armor"?+armorBookP.value:+weaponBookP.value,
     breath:gear==="armor"?+iceP.value:+lavaP.value
   };
 
   const owned={
-    guard:+guardO?.value||0,
-    destroy:+destroyO?.value||0,
-    leap:+leapO.value||0,
-    fusion:+fusionO.value||0,
+    guard:+guardO.value||0,destroy:+destroyO.value||0,
+    leap:+leapO.value||0,fusion:+fusionO.value||0,
     book:gear==="armor"?+armorBookO.value:+weaponBookO.value,
     breath:gear==="armor"?+iceO.value:+lavaO.value
   };
@@ -162,36 +220,34 @@ function run(){
 
   let html="";
   strategies.forEach(s=>{
-    const tries = TOTAL_EXP / expPerTry[s.k];
-    const bookCnt = s.k==="always" ? tries : s.k==="bless" ? tries/6 : 0;
-    const breathCnt = bookCnt * 20;
+    const r=simulateAverage(s.k,gear,cost);
+    let total=r.gold;
+    let rows=`
+      <tr>
+        <td>강화 비용</td>
+        <td>${r.tries.toFixed(1)}회</td>
+        <td>${Math.round(r.gold).toLocaleString()}</td>
+      </tr>`;
 
-    let totalGold = tries * cost.gold;
-    let rows="";
-
-    function add(name,key,amount){
-      const need=Math.max(0,amount-(owned[key]||0));
-      const gold=need*(price[key]||0);
-      totalGold+=gold;
-      rows+=`<tr><td>${name}</td><td>${amount.toFixed(1)}</td><td>${Math.round(gold).toLocaleString()}</td></tr>`;
+    function add(name,key){
+      const need=Math.max(0,r.mats[key]-owned[key]);
+      const g=need*price[key];
+      total+=g;
+      rows+=`<tr><td>${name}</td><td>${r.mats[key].toFixed(1)}</td><td>${Math.round(g).toLocaleString()}</td></tr>`;
     }
 
-    add(cost.main==="guard"?"수호석":"파괴석",cost.main,tries*cost.mainAmt);
-    add("돌파석","leap",tries*cost.leap);
-    add("융화재료","fusion",tries*cost.fusion);
-    if(bookCnt>0){
-      add("재련서","book",bookCnt);
-      add("숨결","breath",breathCnt);
-    }
+    add(cost.main==="guard"?"수호석":"파괴석",cost.main);
+    add("돌파석","leap");
+    add("융화재료","fusion");
+    if(r.mats.book>0){ add("재련서","book"); add("숨결","breath"); }
 
     html+=`
     <section>
       <h2>${s.n}</h2>
-      평균 강화 횟수: <b>${tries.toFixed(1)}</b>회
       <table>
-        <tr><th>재료</th><th>소모량</th><th>골드</th></tr>
+        <tr><th>항목</th><th>횟수/수량</th><th>골드</th></tr>
         ${rows}
-        <tr><th colspan="2">총 골드</th><th>${Math.round(totalGold).toLocaleString()}</th></tr>
+        <tr><th colspan="2">총 골드</th><th>${Math.round(total).toLocaleString()}</th></tr>
       </table>
     </section>`;
   });
